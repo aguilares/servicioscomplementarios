@@ -1,0 +1,350 @@
+import { useState, useEffect } from "react";
+import useAuth from "../Auth/useAuth";
+import md5 from 'md5'
+import { Link } from "react-router-dom";
+import React from 'react';
+
+import { InputUsuario } from '../componentes/elementos/input';
+
+import axios from 'axios'
+
+
+import { URL, INPUT } from '../Auth/config'
+
+
+const Formulario = () => {
+
+  const [usuario, setUsuario] = useState({ campo: '', valido: null })
+  const [password, setPassword] = useState({ campo: '', valido: null })
+  const [correo, setCorreo] = useState({ campo: null, valido: null })
+  const [clave, setClave] = useState({ campo: null, valido: null })
+  const [pass1, setPass1] = useState({ campo: null, valido: null })
+  const [pass2, setPass2] = useState({ campo: null, valido: null })
+
+  const [mensaje, setMensaje] = useState('')
+  const [login, setLogin] = useState(true)
+  const [recover1, setRecover1] = useState(false)
+  const [codigo, setCodigo] = useState(false)
+  const [recover2, setRecover2] = useState(false)
+  const [servicios, setServicios] = useState([])
+  const [idServicio, setIdServicio] = useState({ campo: null, valido: null })
+
+
+  const expresiones = {
+    // usuario: /^[a-zA-Z0-9_-]{4,16}$/, // Letras, numeros, guion y guion_bajo
+    usuario: /^[a-zA-ZÑñ]{4,16}$/, // Letras, numeros, guion y guion_bajo
+    nombre: /^[a-zA-ZÀ-ÿ\s]{1,40}$/, // Letras y espacios, pueden llevar acentos.
+    password: /^.{4,30}$/, // 4 a 12 digitos.
+    correo: /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/,
+    telefono: /^\d{7,14}$/ // 7 a 14 numeros.
+  }
+
+  useEffect(() => {
+    setTimeout(() => {
+      setMensaje(null)
+    }, 10000)
+  }, [mensaje])
+  const auth = useAuth()
+
+  const iniciarSesion = async () => {
+
+    if ((usuario.valido === 'true' && password.valido === 'true')) {
+      const pass = md5(password.campo)
+      const user = usuario.campo;
+
+      try {
+        await axios.get(URL, {
+          params: {
+            "user": user,
+            "pass": pass
+          }
+        }).then(json => {
+
+          if (json.data.token != null) {
+            localStorage.setItem('tiempo', new Date().getMinutes())
+            const token = json.data.token
+            localStorage.setItem("token", token)
+            localStorage.setItem('username', json.data.username)
+            localStorage.setItem('nombre', json.data.nombre)
+            localStorage.setItem('apellido', json.data.apellido)
+            localStorage.setItem('servicio', json.data.servicio)
+            localStorage.setItem('rol', json.data.rol)
+            localStorage.setItem('numRol', json.data.numRol)
+            localStorage.setItem('url', window.location.href)
+            auth.login('ok')
+
+          } else {
+            alert("Datos incorrectos !!!")
+          }
+        })
+      } catch (error) {
+        setMensaje('ERROR, INTENETE MAS TARDE')
+      }
+    } else {
+      setMensaje('INTRODUZCA SUS DATOS')
+    }
+  }
+  const listarServicios = async () => {
+    axios.get(URL + '/listarServicios').then(json => {
+      setServicios(json.data)
+    })
+
+  }
+
+  const enviarSolicitud = async () => {
+    if (correo.valido === 'true') {
+      setRecover1(false)
+      await axios.get(URL + '/olvideMiContrasena', {
+        params: {
+          "correo": correo.campo
+        }
+      }).then(json => {
+        if (json.data.ok === false) {
+          setMensaje(json.data.msg)
+          setRecover1(true)
+        }
+        if (json.data.ok === true) {
+          setCodigo(true)
+          setMensaje(json.data.msg)
+        }
+      })
+    }
+    else {
+      setMensaje('DEBE ESCRIBIR SU CORREO DE RECUPERACION')
+    }
+  }
+
+  const enviarCodigo = async () => {
+    if (clave.valido === 'true' && correo.valido === 'true') {
+      setCodigo(false)
+      await axios.get(URL + '/codigo', {
+        params: {
+          "correo": correo.campo,
+          "codigo": clave.campo
+        }
+      }).then(json => {
+        if (json.data.ok === false) {
+          setMensaje(json.data.msg)
+          setCodigo(true)
+        }
+        if (json.data.ok === true) {
+          setRecover2(true)
+        }
+      })
+    } else {
+      setMensaje('DEBE ESCRIBIR EL CODIGO QUE LE ACABA DE LLEGAR A SU CORREO')
+    }
+  }
+
+  const guardarContraseña = async () => {
+    if (pass1.valido === 'true' && pass2.valido === 'true') {
+      if (pass1.campo === pass2.campo) {
+
+        setRecover2(false)
+        await axios.get(URL + '/nuevaContrasena', {
+          params: {
+            "correo": correo.campo,
+            "pass": md5(pass2.campo)
+          }
+        }).then(json => {
+          if (json.data.ok === true) {
+            setMensaje(json.data.msg)
+            setLogin(true)
+            setPass1({ campo: null, valido: null })
+            setPass2({ campo: null, valido: null })
+            setClave({ campo: null, valido: null })
+            setCorreo({ campo: null, valido: null })
+          }
+          if (json.data.ok === false) {
+            setRecover2(true)
+          }
+        })
+      }
+      else {
+        setMensaje('LAS CONTRASEÑA NO COINCIDEN !!!')
+      }
+    }
+  }
+
+  return (
+    <>
+      {login === true && <div className="hold-transition login-page mt-0">
+        <div className="login-box mt-0">
+          <div className="card card-outline card-primary mt-0">
+            <div className="card-header text-center">
+              <h4 className="login-box-msg"> <p>SAN PEDRO CLAVER</p></h4>
+              <p className='text-danger' >{mensaje}</p>
+            </div>
+            <div className=" card-body">
+              <p className="login-box-msg">inicie session</p>
+              <div className="col-12 mb-3">
+                <InputUsuario
+                  estado={usuario}
+                  cambiarEstado={setUsuario}
+                  tipo="text"
+                  name="user"
+                  placeholder="Usuario"
+                  ExpresionRegular={expresiones.usuario}
+                  span="fas fa-envelope"
+                />
+              </div>
+              <div className="col-12 mb-3">
+                <InputUsuario
+                  estado={password}
+                  cambiarEstado={setPassword}
+                  tipo="password"
+                  name="pass"
+                  placeholder="Contraseña"
+                  ExpresionRegular={expresiones.password}
+                  span="fas fa-lock"
+                />
+              </div>
+              <div className=" col-12 ">
+                <Link
+                  to={'#'}
+                  onClick={iniciarSesion}
+                  className="btn btn-primary btn-block"
+                >Ingresar
+                </Link>
+              </div>
+
+              <div className="card-header"></div>
+              <p className="text-left">
+                <Link to="#" onClick={() => { setRecover1(true); setLogin(false); listarServicios()}}>olvidó su contraseña ?</Link>
+              </p>
+              <br></br>
+
+              <p className="text-left">
+                <Link to="/registrame" className="text-center">Solicite su cuenta ahora! </Link>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      }
+      {
+        recover1 === true &&
+        <div className="hold-transition login-page">
+          <div className="login-box">
+            <div className="card card-outline card-primary">
+              <div className="card-header text-center">
+                <h4 className="login-box-msg"> <p> </p></h4>
+                <p className='text-danger' >{mensaje}</p>
+
+              </div>
+              <div className="card-body">
+                <p className="login-box-msg">INGRESE EL CORREO DE RECUPERACION</p>
+                <p className="login-box-msg" style={{ fontSize: '11px' }}>Si ha perdido el acceso a su correo, contactese con el administrador</p>
+
+                <div className="col-12 mb-3">
+                  <InputUsuario
+                    estado={correo}
+                    cambiarEstado={setCorreo}
+                    name="correo"
+                    placeholder="CORREO ELECTRONICO"
+                    ExpresionRegular={INPUT.CORREO}
+                    etiqueta={'Correo electronico'}
+                    campoUsuario={true}
+                    span="fas fa-envelope"
+
+                  />
+
+                </div>
+                <div className="col-12">
+                  <button type="submit" className="btn btn-primary btn-block" onClick={() => enviarSolicitud()}>Enviar Correo</button>
+                </div>
+                <p className="mt-3 mb-1">
+                  <Link to="#" onClick={() => { setLogin(true); setRecover1(false) }}>Login</Link>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+      {
+        codigo === true &&
+        <div className="hold-transition login-page">
+          <div className="login-box">
+            <div className="card card-outline card-primary">
+              <div className="card-header text-center">
+                <h4 className="login-box-msg"> <p> </p></h4>
+                <p className='text-success' >{mensaje}</p>
+              </div>
+              <div className="card-body">
+                <p className="login-box-msg">INGRESE EL CODIGO QUE LE ACABA DE LLEGAR A SU CORREO</p>
+                <div className="col-12 mb-3">
+                  <InputUsuario
+                    estado={clave}
+                    cambiarEstado={setClave}
+                    name="codigo"
+                    placeholder="CODIGO"
+                    ExpresionRegular={INPUT.DIRECCION}
+                    etiqueta={'CODIGO'}
+                    campoUsuario={true}
+                    span="fas fa-lock"
+                  />
+                </div>
+                <div className="col-12">
+                  <button type="submit" className="btn btn-primary btn-block" onClick={() => enviarCodigo()}>Enviar Codigo</button>
+                </div>
+                <p className="mt-3 mb-1">
+                  <Link to="#" onClick={() => { setRecover1(true); setCodigo(false) }}>Volver</Link>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+      {
+        recover2 === true &&
+        <div className="hold-transition login-page">
+          <div className="login-box">
+            <div className="card card-outline card-primary">
+              <div className="card-header text-center">
+                <h4 className="login-box-msg"> <p> </p></h4>
+              </div>
+              <div className="card-body">
+                <p className="login-box-msg">Confirme su nueva contraseña</p>
+
+                <div className="col-12 mb-3">
+                  <InputUsuario
+                    estado={pass1}
+                    cambiarEstado={setPass1}
+                    name="pass1"
+                    placeholder="Nueva Contraseña"
+                    ExpresionRegular={INPUT.DIRECCION}
+                    etiqueta={'NUEVA CONTRASEÑA'}
+                    campoUsuario={true}
+                    span="fas fa-lock"
+                  />
+                </div>
+                <div className="col-12 mb-3">
+                  <InputUsuario
+                    estado={pass2}
+                    cambiarEstado={setPass2}
+                    name="pass2"
+                    placeholder="Confirmar Contraseña"
+                    ExpresionRegular={INPUT.DIRECCION}
+                    etiqueta={'CONFIRMAR CONTRASEÑA'}
+                    campoUsuario={true}
+                    span="fas fa-lock"
+                  />
+                </div>
+
+                <div className="row">
+                  <div className="col-12">
+                    <button type="submit" className="btn btn-primary btn-block" onClick={() => guardarContraseña()} >Guardar Contraseña</button>
+                  </div>
+                </div>
+                <p className="mt-3 mb-1">
+                  <Link to="#" onClick={() => { setCodigo(true); setRecover2(false) }}>volver</Link>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    </>
+  );
+}
+export default Formulario;
